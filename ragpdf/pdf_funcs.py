@@ -85,9 +85,7 @@ if __name__ == "__main__":
         im = Image.open(io.BytesIO(doc.extract_image(img[0])["image"]))
         bbox = doc[3].get_image_bbox(img)
         print(bbox)
-        desc = analyzer.describe_crop(
-            Cropped(img=im, label="schematic")
-        ).message.content
+        desc = analyzer.describe_crop(Cropped(img=im, label="schematic"))
         # desc = "test"
         print(desc)
         doc[3].draw_rect(

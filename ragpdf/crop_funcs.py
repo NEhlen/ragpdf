@@ -1,4 +1,4 @@
-from PIL import Image
+from getpass import getpass
 from .image_funcs import Cropped
 import os
 from openai import OpenAI
@@ -30,7 +30,14 @@ class CropAnalyzerOpenAI:
                 "In particular if the image is a schematic from a manual describe the measurements shown and what they are measuring."
             )
         if "api_key" not in kwargs:
-            self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            if "OPENAI_API_KEY" in os.environ:
+                self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            else:
+                print(
+                    "No OpenAI api key found in environment, please enter in terminal"
+                )
+                api_key = getpass("OpenAI api key: ")
+                self.client = OpenAI(api_key=api_key)
         else:
             self.client = OpenAI(api_key=kwargs["api_key"])
 
