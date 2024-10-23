@@ -93,7 +93,6 @@ class CropperModel:
             return *self.cleanup_crops(img, boxes, clss), result
         elif self.type == "florence":
             boxes, clss, result = self.crop_florence(img)
-            print(boxes, clss)
             return *self.cleanup_crops(img, boxes, clss), result
 
     def cleanup_crops(self, img, boxes, clss):
@@ -128,11 +127,11 @@ class CropperModel:
         clss = list(clss)
         if len(boxes) <= 1:
             return boxes, clss
-        print(boxes, clss)
+
         # filter out boxes that are mostly inside bigger boxes
         kept_boxes, kept_clss = [], []
         while boxes:
-            print("boxes", boxes)
+
             test_box = boxes.pop(0)
             test_label = clss.pop(0)
             kept_boxes.append(test_box)
