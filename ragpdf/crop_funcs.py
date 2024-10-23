@@ -57,7 +57,7 @@ class CropAnalyzerOpenAI:
             ],
             model="gpt-4o",
         )
-        return chat_completion.choices[0]
+        return chat_completion.choices[0].message.content
 
 
 class CropAnalyzerGeneral:

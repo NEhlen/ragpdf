@@ -1,7 +1,5 @@
 import pymupdf
-import sys
 import os
-import glob
 from pathlib import Path
 from PIL import Image
 
@@ -39,6 +37,19 @@ def convert_pdf_to_image(
         return e
 
 
+def get_text_blocks_from_page(pdf_path: str, page: int) -> dict:
+    doc = pymupdf.open(pdf_path)
+    page = doc[page]
+    return page.get_text("blocks", sort=True)
+
+
+def get_images_from_page(pdf_path: str, page: int) -> Image.Image:
+    doc = pymupdf.open(pdf_path)
+    page = doc[page]
+    images = page.get_images(full=True)
+    return images, doc
+
+
 def get_images_from_pdf(pdf_path: str) -> dict[str, Image.Image]:
     try:
         pymupdf.TOOLS.mupdf_warnings()
@@ -56,3 +67,39 @@ def get_images_from_pdf(pdf_path: str) -> dict[str, Image.Image]:
     except Exception as e:
         print(f"error when extracting images from pdf at {pdf_path}")
         return e
+
+
+if __name__ == "__main__":
+    import io
+    from ragpdf.image_funcs import Cropped
+    from ragpdf.crop_funcs import CropAnalyzerOpenAI
+
+    analyzer = CropAnalyzerOpenAI()
+
+    images, doc = get_images_from_page(
+        "../analyze_pdfs/data/raw/pdfs/Verlegeanleitung_Luftdichtheit_und_Feuchteschutz_-_Vario_KM_Duplex_UV.pdf",
+        3,
+    )
+    ilist = []
+    for img in images[:2]:
+        im = Image.open(io.BytesIO(doc.extract_image(img[0])["image"]))
+        bbox = doc[3].get_image_bbox(img)
+        print(bbox)
+        desc = analyzer.describe_crop(
+            Cropped(img=im, label="schematic")
+        ).message.content
+        # desc = "test"
+        print(desc)
+        doc[3].draw_rect(
+            bbox, color=(1, 1, 1), fill=1
+        )  # Drawing a white rectangle over the image
+        inserted = doc[3].insert_textbox(
+            pymupdf.Rect(bbox[0], bbox[1], bbox[2], 1000),
+            desc,
+            fontsize=5,
+            color=(0, 0, 0),
+            align=0,
+        )
+        print(inserted)
+
+    doc.save("test.pdf")
