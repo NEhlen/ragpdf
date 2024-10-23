@@ -1,3 +1,7 @@
 pypdf
 pillow
 pymupdf
+ultralytics
+transformers
+timm
+einops

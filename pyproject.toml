@@ -17,7 +17,14 @@ classifiers = [
 ]
 
 dependencies = [
-    "pypdf", "pillow", "pymupdf",
+    "pypdf",
+    "pillow",
+    "pymupdf",
+    "openai>=1.0",
+    "ultralytics",
+    "transformers",
+    "timm",
+    "einops"
 ]
 
 [project.optional-dependencies]
