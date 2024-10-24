@@ -136,14 +136,19 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
 class CropAnalyzerHF(CropAnalyzerGeneral):
     def __init__(self, prompt: str = None, **kwargs):
         import torch
-        from transformers import AutoProcessor, AutoModelForVision2Seq
+        from transformers import AutoProcessor, AutoModelForCausalLM
 
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.model = AutoModelForVision2Seq.from_pretrained(
-            "HuggingFaceM4/idefics2-8b",
-            torch_dtype=torch.bfloat16,
-        ).to(self.device)
-        self.processor = AutoProcessor.from_pretrained("HuggingFaceM4/idefics2-8b")
+        self.model = AutoModelForCausalLM.from_pretrained(
+            "microsoft/Phi-3-vision-128k-instruct",
+            device_map=self.device,
+            trust_remote_code=True,
+            torch_dtype="auto",
+            _attn_implementation="eager",
+        )
+        self.processor = AutoProcessor.from_pretrained(
+            "microsoft/Phi-3-vision-128k-instruct", trust_remote_code=True
+        )
 
         if prompt:
             self.prompt = prompt
@@ -159,19 +164,29 @@ class CropAnalyzerHF(CropAnalyzerGeneral):
         messages = [
             {
                 "role": "user",
-                "content": [{"type": "image"}, {"type": "text", "text": self.prompt}],
+                "content": "<|image_1|>\n" + self.prompt,
             }
         ]
-        prompt = self.processor.apply_chat_template(
-            messages, add_generation_prompt=True
+        prompt = self.processor.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
         )
-        inputs = self.processor(
-            text=prompt, images=crop.img, padding=True, return_tensors="pt"
+        inputs = self.processor(text=prompt, images=[crop.img], return_tensors="pt").to(
+            self.device
         )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        generated_ids = self.model.generate(**inputs, max_new_tokens=1024)
+        generation_args = {
+            "max_new_tokens": 1024,
+            "temperature": 0.7,
+            "do_sample": False,
+        }
+
+        generated_ids = self.model.generate(
+            **inputs,
+            eos_token_id=self.processor.tokenizer.eos_token_id,
+            **generation_args,
+        )
+        generated_ids = generated_ids[:, inputs["input_ids"].shape[1] :]
         generated_texts = self.processor.batch_decode(
-            generated_ids, skip_special_tokens=True
+            generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
 
         return generated_texts[0]
