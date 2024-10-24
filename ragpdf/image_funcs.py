@@ -19,46 +19,37 @@ class Cropped:
 class CropperModel:
     def __init__(
         self,
-        type: str = "florence",
-        confidence_threshold: float = 0.1,
         **kwargs,
     ):
-        self.conf_thresh = confidence_threshold
-        self.type = type
-        if self.type == "YOLO":
-            if "model" not in kwargs:
-                raise AttributeError("If type is YOLO, model needs to be given")
-            else:
-                self.model = kwargs["model"]
-        elif self.type == "florence":
-            import torch
-            from transformers import AutoModelForCausalLM, AutoProcessor
+        pass
 
-            self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-            self.torch_dtype = (
-                torch.float16 if torch.cuda.is_available() else torch.float32
-            )
-            self.model = AutoModelForCausalLM.from_pretrained(
-                "microsoft/Florence-2-large-ft",
-                torch_dtype=self.torch_dtype,
-                trust_remote_code=True,
-            ).to(self.device)
-            self.processor = AutoProcessor.from_pretrained(
-                "microsoft/Florence-2-large-ft",
-                trust_remote_code=True,
-            )
-            self.task = "<CAPTION_TO_PHRASE_GROUNDING>"
-            self.prompt = "schematics, text"
-        else:
-            raise ValueError("<type> must be either YOLO or florence")
+    def crop(self, img: Image.Image) -> list[Cropped]:
+        pass
 
-    def crop_yolo(self, img: Image.Image):
-        results = self.model(img, show=False, conf=self.conf_thresh)[0]
-        boxes = results.boxes.xyxy.cpu().tolist()
-        clss = results.boxes.cls.cpu().tolist()
-        return boxes, clss, results
 
-    def crop_florence(self, img: Image.Image):
+class CropperModelFlorence(CropperModel):
+    def __init__(
+        self,
+        **kwargs,
+    ):
+        import torch
+        from transformers import AutoModelForCausalLM, AutoProcessor
+
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+        self.model = AutoModelForCausalLM.from_pretrained(
+            "microsoft/Florence-2-large-ft",
+            torch_dtype=self.torch_dtype,
+            trust_remote_code=True,
+        ).to(self.device)
+        self.processor = AutoProcessor.from_pretrained(
+            "microsoft/Florence-2-large-ft",
+            trust_remote_code=True,
+        )
+        self.task = "<CAPTION_TO_PHRASE_GROUNDING>"
+        self.prompt = "schematics, text"
+
+    def crop(self, img: Image.Image) -> list[Cropped]:
         inputs = self.processor(
             text=self.task + self.prompt,
             images=img,
@@ -93,18 +84,59 @@ class CropperModel:
                 box_tup_schematics,
             )
         boxes, clss = zip(*box_tup_schematics)
-        return list(boxes), list(clss), parsed_answer
+        boxes, clss = cleanup_crops(img, list(boxes), list(clss))
 
-    def crop(self, img: Image.Image):
-        if self.type == "YOLO":
-            boxes, clss, result = self.crop_yolo(img)
-            return *cleanup_crops(img, boxes, clss), result
-        elif self.type == "florence":
-            boxes, clss, result = self.crop_florence(img)
-            return *cleanup_crops(img, boxes, clss), result
+        if boxes:
+            crops = []
+            for box, label in zip(boxes, clss):
+                crops.append(Cropped(img=img.crop(box), bbox=box, label=label))
+            return crops
+        else:
+            return []
 
 
-def cleanup_crops(img, boxes, clss):
+class CropperModelYOLO(CropperModel):
+    def __init__(
+        self,
+        confidence_threshold: float = 0.1,
+        **kwargs,
+    ):
+        self.conf_thresh = confidence_threshold
+        if "model" not in kwargs:
+            raise AttributeError("If type is YOLO, model needs to be given")
+        else:
+            self.model: YOLO = kwargs["model"]
+
+    def crop(self, img: Image.Image) -> list[Cropped]:
+        """
+        Crops the Image. Returns a list of bounding boxes and their labels.
+        """
+        results = self.model(img, show=False, conf=self.conf_thresh)[0]
+        boxes = results.boxes.xyxy.cpu().tolist()
+        clss = results.boxes.cls.cpu().tolist()
+        boxes, clss = cleanup_crops(img, boxes, clss)
+
+        if boxes:
+            crops = []
+            for box, label in zip(boxes, clss):
+                crops.append(Cropped(img=img.crop(box), bbox=box, label=label))
+            return crops
+        else:
+            return []
+
+
+def cleanup_crops(
+    img: Image.Image,
+    boxes: list[Union[int, float]],
+    clss: list[str],
+) -> tuple[list[Union[int, float]], list[str]]:
+    """
+    Cleans up a list of bounding boxes and their labels for a given image.
+    Ensures bounding boxes that stretch across most of the image are filtered out.
+    Ensures bounding boxes that are nearly fully covered by other bounding boxes
+    are filtered out.
+    Returns filtered lists of bounding boxes and their corresponding lavels
+    """
     # filter out boxes that are mostly the whole image
     temp = list(
         zip(
@@ -188,15 +220,3 @@ def compute_overlap(
     SB = (XB2 - XB1) * (YB2 - YB1)
     SU = SA + SB - SI
     return SI / SU, SI / SA, SI / SB
-
-
-def cutout_schemas_single_image(
-    img: Image.Image, cropper: CropperModel
-) -> tuple[list[Cropped], dict]:
-    boxes, clss, results = cropper.crop(img)
-    cropped_imgs = []
-    if boxes is not None:
-        for box, _cls in zip(boxes, clss):
-            cropped = img.crop(box)
-            cropped_imgs.append(Cropped(img=cropped, label=_cls, bbox=box))
-    return cropped_imgs, results
