@@ -68,38 +68,3 @@ def get_images_from_pdf(pdf_path: str) -> dict[str, Image.Image]:
     except Exception as e:
         print(f"error when extracting images from pdf at {pdf_path}")
         return e
-
-
-if __name__ == "__main__":
-    import io
-
-    from ragpdf.crop_funcs import CropAnalyzerOpenAI
-    from ragpdf.image_funcs import Cropped
-
-    analyzer = CropAnalyzerOpenAI()
-
-    images, doc = get_images_from_page(
-        r"..\pdfs\ISOVER_Verlegeanleitung_Steildach_-_Zwischensparrendmmung_Integra_ZKF.pdf",
-        1,
-    )
-    ilist = []
-    for img in images[:2]:
-        im = Image.open(io.BytesIO(doc.extract_image(img[0])["image"]))
-        bbox = doc[1].get_image_bbox(img)
-        print(bbox)
-        desc = analyzer.describe_crop(Cropped(img=im, label="schematic"))
-        # desc = "test"
-        print(desc)
-        doc[1].draw_rect(
-            bbox, color=(1, 1, 1), fill=1
-        )  # Drawing a white rectangle over the image
-        inserted = doc[1].insert_textbox(
-            pymupdf.Rect(bbox[0], bbox[1], bbox[2], 1000),
-            desc,
-            fontsize=5,
-            color=(0, 0, 0),
-            align=0,
-        )
-        print(inserted)
-
-    doc.save("test.pdf")

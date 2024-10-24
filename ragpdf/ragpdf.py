@@ -128,3 +128,4 @@ def replace_images_in_pdf(
                 )
 
     pdf.save("test.pdf")
+    return pdf
