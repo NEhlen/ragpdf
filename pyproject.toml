@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build]
 include = [
-  "ragpdf/**/*.pt",
-  "**/*.py"
+  "raggifypdf/**/*.pt",
+  "raggifypdf/**/*.py"
 ]
 
 [project]
-name = "ragPDF"
+name = "raggifyPDF"
 version = "0.0.1"
 requires-python = ">= 3.12.0"
 authors = [
