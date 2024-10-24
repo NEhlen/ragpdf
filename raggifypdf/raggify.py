@@ -10,8 +10,8 @@ import tqdm
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-from ragpdf.crop_funcs import Cropped, CropAnalyzerGeneral
-from ragpdf.image_funcs import (
+from raggifypdf.crop_funcs import Cropped, CropAnalyzerGeneral
+from raggifypdf.image_funcs import (
     YOLO,
     CropperModel,
     compute_overlap,
@@ -222,11 +222,11 @@ def replace_images_with_text_in_pdf(
 ):
     pdf = pymupdf.open(pdf_path)
     if evaluation == "OpenAI":
-        from ragpdf.crop_funcs import CropAnalyzerOpenAI
+        from raggifypdf.crop_funcs import CropAnalyzerOpenAI
 
         analyzer = CropAnalyzerOpenAI()
     elif evaluation == "GCP":
-        from ragpdf.crop_funcs import CropAnalyzerGCP
+        from raggifypdf.crop_funcs import CropAnalyzerGCP
 
         analyzer = CropAnalyzerGCP()
     else:

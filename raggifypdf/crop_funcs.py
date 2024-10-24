@@ -3,7 +3,7 @@ import io
 import os
 from getpass import getpass
 
-from ragpdf.image_funcs import Cropped
+from raggifypdf.image_funcs import Cropped
 
 
 def convert_crop_to_png(crop: Cropped):
