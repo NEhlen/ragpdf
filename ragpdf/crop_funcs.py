@@ -1,8 +1,9 @@
-from getpass import getpass
-from .image_funcs import Cropped
+import base64
+import io
 import os
-from openai import OpenAI
-import base64, io
+from getpass import getpass
+
+from .image_funcs import Cropped
 
 
 def convert_crop_to_png(crop: Cropped):
@@ -16,11 +17,22 @@ def convert_crop_to_base64(crop: Cropped):
     return base64.b64encode(png_img).decode("utf-8")
 
 
+class CropAnalyzerGeneral:
+    def __init__(self, prompt: str = None):
+        self.prompt = prompt
+
+    # get a description of the crop
+    def describe_crop(self, crop: Cropped):
+        pass
+
+
 # the analyzer for the crops
 # model-dependent class
 # needs to be implemented per vendor
-class CropAnalyzerOpenAI:
+class CropAnalyzerOpenAI(CropAnalyzerGeneral):
     def __init__(self, prompt: str = None, **kwargs):
+        from openai import OpenAI
+
         if prompt:
             self.prompt = prompt
         else:
@@ -65,12 +77,3 @@ class CropAnalyzerOpenAI:
             model="gpt-4o",
         )
         return chat_completion.choices[0].message.content
-
-
-class CropAnalyzerGeneral:
-    def __init__(self, prompt: str = None):
-        self.prompt = prompt
-
-    # get a description of the crop
-    def describe_crop(self, crop: Cropped):
-        pass

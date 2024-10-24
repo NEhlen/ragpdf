@@ -1,12 +1,19 @@
-from ultralytics import YOLO
+import logging
 from dataclasses import dataclass
+from typing import Union
+
 from PIL import Image
+from pymupdf import Rect
+from ultralytics import YOLO
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Cropped:
     img: Image.Image
     label: str
+    bbox: list[float | int]
 
 
 class CropperModel:
@@ -25,7 +32,7 @@ class CropperModel:
                 self.model = kwargs["model"]
         elif self.type == "florence":
             import torch
-            from transformers import AutoProcessor, AutoModelForCausalLM
+            from transformers import AutoModelForCausalLM, AutoProcessor
 
             self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
             self.torch_dtype = (
@@ -61,7 +68,7 @@ class CropperModel:
             input_ids=inputs["input_ids"],
             pixel_values=inputs["pixel_values"],
             max_new_tokens=1024,
-            num_beams=3,
+            num_beams=2,
         )
         generated_text = self.processor.batch_decode(
             generated_ids, skip_special_tokens=False
@@ -79,29 +86,28 @@ class CropperModel:
         box_tup = list(zip(boxes, clss))
         box_tup_schematics = list(filter(lambda x: x[1] == "schematics", box_tup))
         box_tup_text = list(filter(lambda x: x[1] == "text", box_tup))
-        box_tup_schematics = filter(
-            lambda x: max([compute_overlap(x[0], bt[0])[0] for bt in box_tup_text])
-            < 0.9,
-            box_tup_schematics,
-        )
+        if box_tup_text:
+            box_tup_schematics = filter(
+                lambda x: max([compute_overlap(x[0], bt[0])[0] for bt in box_tup_text])
+                < 0.9,
+                box_tup_schematics,
+            )
         boxes, clss = zip(*box_tup_schematics)
         return list(boxes), list(clss), parsed_answer
 
     def crop(self, img: Image.Image):
         if self.type == "YOLO":
             boxes, clss, result = self.crop_yolo(img)
-            return *self.cleanup_crops(img, boxes, clss), result
+            return *cleanup_crops(img, boxes, clss), result
         elif self.type == "florence":
             boxes, clss, result = self.crop_florence(img)
-            return *self.cleanup_crops(img, boxes, clss), result
+            return *cleanup_crops(img, boxes, clss), result
 
-    def cleanup_crops(self, img, boxes, clss):
-        # remove crops with too high overlap
-        # remove crops that are whole page if there are smaller
-        # crops present
 
-        # filter out boxes that are mostly the whole image
-        boxes, clss = zip(
+def cleanup_crops(img, boxes, clss):
+    # filter out boxes that are mostly the whole image
+    temp = list(
+        zip(
             *filter(
                 lambda x: compute_overlap(
                     x[0],
@@ -111,48 +117,70 @@ class CropperModel:
                 zip(boxes, clss),
             )
         )
+    )
+    if not temp:
+        return [], []
 
-        # sort boxes by size from largest to smallest
-        _, boxes, clss in zip(
-            *sorted(
-                zip(
-                    [(box[2] - box[0]) * (box[3] - box[1]) for box in boxes],
-                    boxes,
-                    clss,
-                ),
-                reverse=True,
-            )
+    boxes, clss = temp
+
+    # sort boxes by size from largest to smallest
+    _, boxes, clss = zip(
+        *sorted(
+            zip(
+                [(box[2] - box[0]) * (box[3] - box[1]) for box in boxes],
+                boxes,
+                clss,
+            ),
+            reverse=True,
         )
-        boxes = list(boxes)
-        clss = list(clss)
-        if len(boxes) <= 1:
-            return boxes, clss
+    )
+    boxes = list(boxes)
+    clss = list(clss)
+    if len(boxes) <= 1:
+        return boxes, clss
 
-        # filter out boxes that are mostly inside bigger boxes
-        kept_boxes, kept_clss = [], []
-        while boxes:
+    # filter out boxes that are mostly inside bigger boxes
+    kept_boxes, kept_clss = [], []
+    while boxes:
 
-            test_box = boxes.pop(0)
-            test_label = clss.pop(0)
-            kept_boxes.append(test_box)
-            kept_clss.append(test_label)
-            if boxes:
-                p = zip(
+        test_box = boxes.pop(0)
+        test_label = clss.pop(0)
+        kept_boxes.append(test_box)
+        kept_clss.append(test_label)
+        if boxes:
+            p = list(
+                zip(
                     *filter(
                         lambda x: compute_overlap(test_box, x[0])[2] < 0.8,
                         zip(boxes, clss),
                     )
                 )
+            )
+            if p:
                 boxes, clss = p
                 boxes = list(boxes)
                 clss = list(clss)
-        return kept_boxes, kept_clss
+            else:
+                boxes = []
+                clss = []
+    return kept_boxes, kept_clss
 
 
 # compute overlap between two boxes,
 # return relative overlaps
 # intersection/union, intersection/area_box0, intersection/area_box1
-def compute_overlap(box0, box1):
+def compute_overlap(
+    box0: Union[Rect, list[Union[int, float]]],
+    box1: Union[Rect, list[Union[int, float]]],
+) -> tuple[float, float, float]:
+    """
+    Compute Overlap between wo bounding boxes.
+    Give the bounding boxes in xyxy-Format, ideally as pymupdf Rects,
+    alternatively as lists of ints/floats
+    returns the relative overlaps
+
+    Returns: (intersection/union, intersecion/area_box0, intersection/area_box1)
+    """
     XA1, YA1, XA2, YA2 = box0
     XB1, YB1, XB2, YB2 = box1
     SI = max(0, min(XA2, XB2) - max(XA1, XB1)) * max(0, min(YA2, YB2) - max(YA1, YB1))
@@ -162,23 +190,13 @@ def compute_overlap(box0, box1):
     return SI / SU, SI / SA, SI / SB
 
 
-def cutout_schemas_single_image(img: Image.Image, cropper: CropperModel):
+def cutout_schemas_single_image(
+    img: Image.Image, cropper: CropperModel
+) -> tuple[list[Cropped], dict]:
     boxes, clss, results = cropper.crop(img)
     cropped_imgs = []
     if boxes is not None:
         for box, _cls in zip(boxes, clss):
             cropped = img.crop(box)
-            cropped_imgs.append(Cropped(img=cropped, label=_cls))
+            cropped_imgs.append(Cropped(img=cropped, label=_cls, bbox=box))
     return cropped_imgs, results
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    img = Image.open(
-        "../analyze_pdfs/data/images/train/gebrauchsanweisung_7700359-4.png"
-    )
-    model = YOLO("../analyze_pdfs/models/yolo11n_best.pt")
-    cropper = CropperModel(type="YOLO", confidence_threshold=0.8, model=model)
-    # cropper = CropperModel(type="florence", confidence_threshold=0.8)
-    crops, results = cutout_schemas_single_image(img, cropper)

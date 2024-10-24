@@ -2,12 +2,18 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+include = [
+  "ragpdf/**/*.pt",
+  "**/*.py"
+]
+
 [project]
 name = "ragPDF"
 version = "0.0.1"
 requires-python = ">= 3.12.0"
 authors = [
-  {name="Dr. Niels Ehlen", email="author@example.com"}
+  {name="Dr. Niels Ehlen", email="44569709+NEhlen@users.noreply.github.com"}
 ]
 description = "A package for analyzing PDFs with GenAI"
 readme = "README.md"
@@ -26,6 +32,7 @@ dependencies = [
     "timm",
     "einops"
 ]
+
 
 [project.optional-dependencies]
 linting = [

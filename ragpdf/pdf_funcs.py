@@ -1,6 +1,7 @@
-import pymupdf
 import os
 from pathlib import Path
+
+import pymupdf
 from PIL import Image
 
 
@@ -71,27 +72,28 @@ def get_images_from_pdf(pdf_path: str) -> dict[str, Image.Image]:
 
 if __name__ == "__main__":
     import io
-    from ragpdf.image_funcs import Cropped
+
     from ragpdf.crop_funcs import CropAnalyzerOpenAI
+    from ragpdf.image_funcs import Cropped
 
     analyzer = CropAnalyzerOpenAI()
 
     images, doc = get_images_from_page(
-        "../analyze_pdfs/data/raw/pdfs/Verlegeanleitung_Luftdichtheit_und_Feuchteschutz_-_Vario_KM_Duplex_UV.pdf",
-        3,
+        r"..\pdfs\ISOVER_Verlegeanleitung_Steildach_-_Zwischensparrendmmung_Integra_ZKF.pdf",
+        1,
     )
     ilist = []
     for img in images[:2]:
         im = Image.open(io.BytesIO(doc.extract_image(img[0])["image"]))
-        bbox = doc[3].get_image_bbox(img)
+        bbox = doc[1].get_image_bbox(img)
         print(bbox)
         desc = analyzer.describe_crop(Cropped(img=im, label="schematic"))
         # desc = "test"
         print(desc)
-        doc[3].draw_rect(
+        doc[1].draw_rect(
             bbox, color=(1, 1, 1), fill=1
         )  # Drawing a white rectangle over the image
-        inserted = doc[3].insert_textbox(
+        inserted = doc[1].insert_textbox(
             pymupdf.Rect(bbox[0], bbox[1], bbox[2], 1000),
             desc,
             fontsize=5,
