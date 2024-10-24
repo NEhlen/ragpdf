@@ -25,7 +25,7 @@ class CropAnalyzerGeneral:
         self.prompt = prompt
 
     # get a description of the crop
-    def describe_crop(self, crop: Cropped):
+    def describe_crop(self, crop: Cropped) -> str:
         pass
 
 
@@ -54,7 +54,7 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
             self.client = OpenAI(api_key=kwargs["api_key"])
 
     # get a description of the crop
-    def describe_crop(self, crop: Cropped):
+    def describe_crop(self, crop: Cropped) -> str:
         encoded_image = convert_crop_to_base64(crop)
         chat_completion = self.client.chat.completions.create(
             messages=[
@@ -114,12 +114,12 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
         else:
             self.generation_config = {
                 "max_output_tokens": 8192,
-                "temperature": 1,
+                "temperature": 0.7,
                 "top_p": 0.95,
             }
 
     # get a description of the crop
-    def describe_crop(self, crop: Cropped):
+    def describe_crop(self, crop: Cropped) -> str:
         from vertexai.generative_models import Part
 
         encoded_image = Part.from_data(
@@ -131,3 +131,61 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
             stream=False,
         )
         return response.text
+
+
+class CropAnalyzerHF(CropAnalyzerGeneral):
+    def __init__(self, prompt: str = None, **kwargs):
+        import torch
+        from transformers import AutoProcessor, AutoModelForVision2Seq
+
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.model = AutoModelForVision2Seq.from_pretrained(
+            "HuggingFaceM4/idefics2-8b",
+            torch_dtype=torch.bfloat16,
+        ).to(self.device)
+        self.processor = AutoProcessor.from_pretrained("HuggingFaceM4/idefics2-8b")
+
+        if prompt:
+            self.prompt = prompt
+        else:
+            self.prompt = (
+                "I'm sending you a cropped image from a PDF. "
+                "Please try to describe in detail what is shown in the image. "
+                "In particular if the image is a schematic from a manual describe the measurements shown and what they are measuring."
+            )
+
+    # get a description of the crop
+    def describe_crop(self, crop: Cropped) -> str:
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "image"}, {"type": "text", "text": self.prompt}],
+            }
+        ]
+        prompt = self.processor.apply_chat_template(
+            messages, add_generation_prompt=True
+        )
+        inputs = self.processor(
+            text=prompt, images=crop.img, padding=True, return_tensors="pt"
+        )
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        generated_ids = self.model.generate(**inputs, max_new_tokens=1024)
+        generated_texts = self.processor.batch_decode(
+            generated_ids, skip_special_tokens=True
+        )
+
+        return generated_texts[0]
+
+
+if __name__ == "__main__":
+    from PIL import Image
+
+    test = Cropped(
+        img=Image.open(
+            "/home/niels/dev/pdf_analyzer/analyze_pdfs/data/test/description.png"
+        ),
+        label="schematic",
+        bbox=[0, 0, 1, 1],
+    )
+    analyzer = CropAnalyzerHF()
+    print(analyzer.describe_crop(test))
