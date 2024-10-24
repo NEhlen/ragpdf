@@ -30,7 +30,8 @@ dependencies = [
     "ultralytics",
     "transformers",
     "timm",
-    "einops"
+    "einops",
+    "torch"
 ]
 
 
@@ -41,4 +42,8 @@ linting = [
 formatting = [
   'black[d]'
 ]
-dev = ['my_application_name[linting, formatting]']
+dev = ['ragpdf[linting, formatting]']
+
+gcp = ["google-cloud-aiplatform"]
+
+huggingface = ["accelerate"]

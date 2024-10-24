@@ -5,3 +5,7 @@ ultralytics
 transformers
 timm
 einops
+google-cloud-aiplatform
+accelerate
+flash_attn
+torch
