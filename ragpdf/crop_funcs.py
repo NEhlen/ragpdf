@@ -3,7 +3,7 @@ import io
 import os
 from getpass import getpass
 
-from .image_funcs import Cropped
+from ragpdf.image_funcs import Cropped
 
 
 def convert_crop_to_png(crop: Cropped):
@@ -17,6 +17,9 @@ def convert_crop_to_base64(crop: Cropped):
     return base64.b64encode(png_img).decode("utf-8")
 
 
+# the analyzer for the crops
+# model-dependent class
+# needs to be implemented per vendor
 class CropAnalyzerGeneral:
     def __init__(self, prompt: str = None):
         self.prompt = prompt
@@ -26,9 +29,6 @@ class CropAnalyzerGeneral:
         pass
 
 
-# the analyzer for the crops
-# model-dependent class
-# needs to be implemented per vendor
 class CropAnalyzerOpenAI(CropAnalyzerGeneral):
     def __init__(self, prompt: str = None, **kwargs):
         from openai import OpenAI
@@ -77,3 +77,57 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
             model="gpt-4o",
         )
         return chat_completion.choices[0].message.content
+
+
+class CropAnalyzerGCP(CropAnalyzerGeneral):
+    def __init__(self, prompt: str = None, **kwargs):
+        import vertexai
+        from vertexai.generative_models import GenerativeModel, Part, SafetySetting
+
+        if prompt:
+            self.prompt = prompt
+        else:
+            self.prompt = (
+                "I'm sending you a cropped image from a PDF. "
+                "Please try to describe in detail what is shown in the image. "
+                "In particular if the image is a schematic from a manual describe the measurements shown and what they are measuring."
+            )
+        if "location" not in kwargs:
+            location = "europe-west3"
+        else:
+            location = kwargs["location"]
+
+        if "project" not in kwargs:
+            print("No GCP project-id given in kwarg 'project', please enter below")
+            project = getpass("GCP-project-id: ")
+        else:
+            project = kwargs["project"]
+        vertexai.init(project=project, location=location)
+
+        if "model" in kwargs:
+            self.model = GenerativeModel(kwargs["model"])
+        else:
+            self.model = GenerativeModel("gemini-1.5-flash-002")
+
+        if "generation_config" in kwargs:
+            self.generation_config = kwargs["generation_config"]
+        else:
+            self.generation_config = {
+                "max_output_tokens": 8192,
+                "temperature": 1,
+                "top_p": 0.95,
+            }
+
+    # get a description of the crop
+    def describe_crop(self, crop: Cropped):
+        from vertexai.generative_models import Part
+
+        encoded_image = Part.from_data(
+            mime_type="image/png", data=convert_crop_to_base64(crop)
+        )
+        response = self.model.generate_content(
+            [encoded_image, self.prompt],
+            generation_config=self.generation_config,
+            stream=False,
+        )
+        return response.text
