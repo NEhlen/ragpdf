@@ -53,6 +53,11 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
         else:
             self.client = OpenAI(api_key=kwargs["api_key"])
 
+        if "model_id" in kwargs:
+            self.model = kwargs["model_id"]
+        else:
+            self.model = "gpt-4o-mini"
+
     # get a description of the crop
     def describe_crop(self, crop: Cropped) -> str:
         encoded_image = convert_crop_to_base64(crop)
@@ -74,7 +79,7 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
                     ],
                 }
             ],
-            model="gpt-4o",
+            model=self.model,
         )
         return chat_completion.choices[0].message.content
 
@@ -104,8 +109,8 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
             project = kwargs["project"]
         vertexai.init(project=project, location=location)
 
-        if "model" in kwargs:
-            self.model = GenerativeModel(kwargs["model"])
+        if "model_id" in kwargs:
+            self.model = GenerativeModel(kwargs["model_id"])
         else:
             self.model = GenerativeModel("gemini-1.5-flash-002")
 
