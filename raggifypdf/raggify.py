@@ -117,7 +117,7 @@ class PDFModifier:
             # with elongated box along y-direction to ensure the text fits
             inserted = page.insert_textbox(
                 pymupdf.Rect(crop.bbox[0], crop.bbox[1], crop.bbox[2], 1000),
-                desc,
+                "[IMG]" + desc + "[/IMG]",
                 fontsize=5,
                 color=(0, 0, 0),
                 align=0,
@@ -131,7 +131,7 @@ class PDFModifier:
     def modify(self):
         logging.info("Modifying PDF for RAG use")
         # go through pages
-        for page_num, page in enumerate(self.pdf):
+        for page_num, _ in enumerate(self.pdf):
             # get all crops
             crops = self.get_all_crops(page_num)
             # evaluate crops
@@ -143,8 +143,8 @@ class PDFModifier:
 
     def save_pdf(self, save_path: str):
         full_path = os.path.abspath(save_path)
-        logging.info(f"Saving PDF to {save_path}")
-        self.pdf.save(save_path)
+        logging.info(f"Saving PDF to {full_path}")
+        self.pdf.save(full_path)
         return self.pdf
 
 
@@ -233,18 +233,22 @@ def replace_images_with_text_in_pdf(
         raise ValueError("<evaluation> needs to be set to a valid Analyzer")
 
     if method == "florence":
+        from raggifypdf.image_funcs import CropperModelFlorence
+
         logger.debug("using florence")
-        cropper = CropperModel(type="florence")
+        cropper = CropperModelFlorence()
 
     elif method == "YOLO":
+        from raggifypdf.image_funcs import CropperModelYOLO
+
         logger.debug("using YOLO")
         if not yolo_model:
             logger.debug("loading fallback YOLO")
             with pkg_resources.path(
-                "ragpdf.model", "yolo11n_fallback.pt"
+                "raggifypdf.model", "yolo11n_fallback.pt"
             ) as model_path:
                 yolo_model = YOLO(str(model_path))
-        cropper = CropperModel(type="YOLO", confidence_threshold=0.8, model=yolo_model)
+        cropper = CropperModelYOLO(confidence_threshold=0.8, model=yolo_model)
     else:
         raise ValueError("Method needs to be YOLO or florence")
 
