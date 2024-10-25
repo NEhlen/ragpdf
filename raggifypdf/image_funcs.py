@@ -5,6 +5,7 @@ from typing import Union
 from PIL import Image
 from pymupdf import Rect
 from ultralytics import YOLO
+import importlib.resources as pkg_resources
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,11 @@ class CropperModelYOLO(CropperModel):
     ):
         self.conf_thresh = confidence_threshold
         if "model" not in kwargs:
-            raise AttributeError("If type is YOLO, model needs to be given")
+            print("loading fallback YOLO")
+            with pkg_resources.path(
+                "raggifypdf.model", "yolo11n_fallback.pt"
+            ) as model_path:
+                self.model = YOLO(str(model_path))
         else:
             self.model: YOLO = kwargs["model"]
 
