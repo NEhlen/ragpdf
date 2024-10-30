@@ -1,3 +1,4 @@
+import importlib.resources as pkg_resources
 import logging
 from dataclasses import dataclass
 from typing import Union
@@ -5,7 +6,6 @@ from typing import Union
 from PIL import Image
 from pymupdf import Rect
 from ultralytics import YOLO
-import importlib.resources as pkg_resources
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,27 @@ class CropperModel:
         pass
 
     def crop(self, img: Image.Image) -> list[Cropped]:
+        """
+        Cropper specific crop function.
+        Input:
+            img: pillow Image
+        Output:
+            list[Cropped]: list of Cropped object data classes holding cropped image, bounding box and label
+        """
         pass
+
+    def cleanup(
+        self, boxes: list[list[float | int] | Rect], clss: list[str]
+    ) -> tuple[list[list[float | int] | Rect], list[str]]:
+        """
+        Cropper specific cleanup function.
+        Input:
+            boxes: list of bounbing boxes (either list of ints/floats of four corners or Rect Object from pymudpdf)
+            clss: list of label strings
+        Output:
+            (boxes, clss): filtered lists
+        """
+        return boxes, clss
 
 
 class CropperModelFlorence(CropperModel):
@@ -50,31 +70,8 @@ class CropperModelFlorence(CropperModel):
         self.task = "<CAPTION_TO_PHRASE_GROUNDING>"
         self.prompt = "schematics, text"
 
-    def crop(self, img: Image.Image) -> list[Cropped]:
-        inputs = self.processor(
-            text=self.task + self.prompt,
-            images=img,
-            return_tensors="pt",
-        ).to(self.device, self.torch_dtype)
-        generated_ids = self.model.generate(
-            input_ids=inputs["input_ids"],
-            pixel_values=inputs["pixel_values"],
-            max_new_tokens=1024,
-            num_beams=2,
-        )
-        generated_text = self.processor.batch_decode(
-            generated_ids, skip_special_tokens=False
-        )[0]
-        parsed_answer = self.processor.post_process_generation(
-            generated_text,
-            task=self.task,
-            image_size=(img.width, img.height),
-        )
-
-        boxes = parsed_answer[self.task]["bboxes"]
-        clss = parsed_answer[self.task]["labels"]
-
-        # filter out boxes that are text
+    def cleanup(self, boxes, clss):
+        # filter out boxes that are text by checking overlap
         box_tup = list(zip(boxes, clss))
         box_tup_schematics = list(filter(lambda x: x[1] == "schematics", box_tup))
         box_tup_text = list(filter(lambda x: x[1] == "text", box_tup))
@@ -85,8 +82,42 @@ class CropperModelFlorence(CropperModel):
                 box_tup_schematics,
             )
         boxes, clss = zip(*box_tup_schematics)
+        return boxes, clss
+
+    def crop(self, img: Image.Image, **kwargs) -> list[Cropped]:
+        # process image with task and prompt
+        inputs = self.processor(
+            text=self.task + self.prompt,
+            images=img,
+            return_tensors="pt",
+        ).to(self.device, self.torch_dtype)
+        # generate tokens
+        generated_ids = self.model.generate(
+            input_ids=inputs["input_ids"],
+            pixel_values=inputs["pixel_values"],
+            **kwargs,
+        )
+        # decode generated tokens
+        generated_text = self.processor.batch_decode(
+            generated_ids, skip_special_tokens=False
+        )[0]
+        # parse the generated answer
+        parsed_answer = self.processor.post_process_generation(
+            generated_text,
+            task=self.task,
+            image_size=(img.width, img.height),
+        )
+
+        boxes = parsed_answer[self.task]["bboxes"]
+        clss = parsed_answer[self.task]["labels"]
+
+        # clean up by removing doubled labels (in particular images that are also labeled
+        # as text)
+        boxes, clss = self.cleanup(boxes, clss)
+        # standard cleanup, see below
         boxes, clss = cleanup_crops(img, list(boxes), list(clss))
 
+        # if there are any found bboxes, return list of Cropped objects
         if boxes:
             crops = []
             for box, label in zip(boxes, clss):
@@ -113,9 +144,6 @@ class CropperModelYOLO(CropperModel):
             self.model: YOLO = kwargs["model"]
 
     def crop(self, img: Image.Image) -> list[Cropped]:
-        """
-        Crops the Image. Returns a list of bounding boxes and their labels.
-        """
         results = self.model(img, show=False, conf=self.conf_thresh)[0]
         boxes = results.boxes.xyxy.cpu().tolist()
         clss = results.boxes.cls.cpu().tolist()
