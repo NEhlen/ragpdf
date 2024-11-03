@@ -195,17 +195,3 @@ class CropAnalyzerHF(CropAnalyzerGeneral):
         )
 
         return generated_texts[0]
-
-
-if __name__ == "__main__":
-    from PIL import Image
-
-    test = Cropped(
-        img=Image.open(
-            "/home/niels/dev/pdf_analyzer/analyze_pdfs/data/test/description.png"
-        ),
-        label="schematic",
-        bbox=[0, 0, 1, 1],
-    )
-    analyzer = CropAnalyzerHF()
-    print(analyzer.describe_crop(test))
