@@ -21,7 +21,7 @@ Clone the repository with
 
 Install the repository in your virtual enviroment
 ```
-pip install ./ragpdf[full]
+pip install ./ragpdf[huggingface, gcp]
 ```
 
 ## How to use / Quickstart
