@@ -40,6 +40,7 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
                 "I'm sending you a cropped image from a PDF. "
                 "Please try to describe in detail what is shown in the image. "
                 "In particular if the image is a schematic from a manual describe the measurements shown and what they are measuring."
+                "You might also get additional context for interpreting the image, but I cannot guarantee that."
             )
         if "api_key" not in kwargs:
             if "OPENAI_API_KEY" in os.environ:
@@ -59,8 +60,11 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
             self.model = "gpt-4o-mini"
 
     # get a description of the crop
-    def describe_crop(self, crop: Cropped) -> str:
+    def describe_crop(self, crop: Cropped, context: str = None) -> str:
         encoded_image = convert_crop_to_base64(crop)
+        txt = self.prompt
+        if context:
+            txt += "\n\nCONTEXT:\n" + context
         chat_completion = self.client.chat.completions.create(
             messages=[
                 {
@@ -68,7 +72,7 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
                     "content": [
                         {
                             "type": "text",
-                            "text": self.prompt,
+                            "text": txt,
                         },
                         {
                             "type": "image_url",
@@ -168,14 +172,18 @@ class CropAnalyzerHF(CropAnalyzerGeneral):
                 "I'm sending you a cropped image from a PDF. "
                 "Please try to describe in detail what is shown in the image. "
                 "In particular if the image is a schematic from a manual describe the measurements shown and what they are measuring."
+                "You might also get additional context for interpreting the image, but I cannot guarantee that."
             )
 
     # get a description of the crop
-    def describe_crop(self, crop: Cropped) -> str:
+    def describe_crop(self, crop: Cropped, context: str = None) -> str:
+        txt = self.prompt
+        if context:
+            txt += "\n\nCONTEXT:\n" + context
         messages = [
             {
                 "role": "user",
-                "content": "<|image_1|>\n" + self.prompt,
+                "content": "<|image_1|>\n" + txt,
             }
         ]
         prompt = self.processor.tokenizer.apply_chat_template(
