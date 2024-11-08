@@ -96,6 +96,7 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
                 "I'm sending you a cropped image from a PDF. "
                 "Please try to describe in detail what is shown in the image. "
                 "In particular if the image is a schematic from a manual describe the measurements shown and what they are measuring."
+                "You might also get additional context for interpreting the image, but I cannot guarantee that."
             )
         if "location" not in kwargs:
             location = "europe-west3"
@@ -104,7 +105,7 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
 
         if "project" not in kwargs:
             print("No GCP project-id given in kwarg 'project', please enter below")
-            project = getpass("GCP-project-id: ")
+            project = input("GCP-project-id: ")
         else:
             project = kwargs["project"]
         vertexai.init(project=project, location=location)
@@ -124,14 +125,19 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
             }
 
     # get a description of the crop
-    def describe_crop(self, crop: Cropped) -> str:
+    def describe_crop(self, crop: Cropped, context: str = None) -> str:
         from vertexai.generative_models import Part
 
         encoded_image = Part.from_data(
             mime_type="image/png", data=convert_crop_to_base64(crop)
         )
+
+        txt = self.prompt
+        if context:
+            txt += "\n\nCONTEXT:\n" + context
+
         response = self.model.generate_content(
-            [encoded_image, self.prompt],
+            [encoded_image, txt],
             generation_config=self.generation_config,
             stream=False,
         )
@@ -141,7 +147,7 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
 class CropAnalyzerHF(CropAnalyzerGeneral):
     def __init__(self, prompt: str = None, **kwargs):
         import torch
-        from transformers import AutoProcessor, AutoModelForCausalLM
+        from transformers import AutoModelForCausalLM, AutoProcessor
 
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.model = AutoModelForCausalLM.from_pretrained(
