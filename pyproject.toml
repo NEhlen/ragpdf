@@ -10,8 +10,8 @@ include = [
 
 [project]
 name = "raggifyPDF"
-version = "0.0.1"
-requires-python = ">= 3.12.0"
+version = "0.1.0"
+requires-python = ">= 3.9.0"
 authors = [
   {name="Dr. Niels Ehlen", email="44569709+NEhlen@users.noreply.github.com"}
 ]

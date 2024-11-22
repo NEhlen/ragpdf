@@ -123,7 +123,7 @@ class PDFModifier:
             inserted = page.insert_textbox(
                 pymupdf.Rect(crop.bbox[0], crop.bbox[1], crop.bbox[2], 1000),
                 "[IMG]" + desc + "[/IMG]",
-                fontsize=5,
+                fontsize=2,
                 color=(0, 0, 0),
                 align=0,
             )
@@ -138,7 +138,7 @@ class PDFModifier:
     ) -> tuple[pymupdf.Document, dict[str, PageCrop]]:
         logging.info("Modifying PDF for RAG use")
         if pages == "full":
-            pages = range(len(self.doc))
+            pages = range(len(self.pdf))
         # go through pages
         data_dict = {}
         for page_num in pages:

@@ -91,7 +91,7 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
 class CropAnalyzerGCP(CropAnalyzerGeneral):
     def __init__(self, prompt: str = None, **kwargs):
         import vertexai
-        from vertexai.generative_models import GenerativeModel, Part, SafetySetting
+        from vertexai.generative_models import GenerativeModel
 
         if prompt:
             self.prompt = prompt
@@ -108,8 +108,8 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
             location = kwargs["location"]
 
         if "project" not in kwargs:
-            print("No GCP project-id given in kwarg 'project', please enter below")
-            project = input("GCP-project-id: ")
+            print("No GCP project-id given in kwarg 'project', using None instead")
+            project = None
         else:
             project = kwargs["project"]
         vertexai.init(project=project, location=location)

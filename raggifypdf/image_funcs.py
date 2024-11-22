@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class Cropped:
     img: Image.Image
     label: str
-    bbox: list[float | int]
+    bbox: list[Union[float, int]]
 
 
 class CropperModel:
@@ -35,8 +35,8 @@ class CropperModel:
         pass
 
     def cleanup(
-        self, boxes: list[list[float | int] | Rect], clss: list[str]
-    ) -> tuple[list[list[float | int] | Rect], list[str]]:
+        self, boxes: list[Union[list[Union[float, int]], Rect]], clss: list[str]
+    ) -> tuple[list[Union[list[Union[float, int]], Rect]], list[str]]:
         """
         Cropper specific cleanup function.
         Input:
