@@ -123,7 +123,7 @@ class PDFModifier:
             crop_bbox = pymupdf.Rect(
                 crop.bbox[0], crop.bbox[1], crop.bbox[2], crop.bbox[3] + 1000
             )
-            if crop_bbox.is_valid and (not crop_bbox.is_empty):
+            if crop_bbox.is_valid or (not crop_bbox.is_empty):
                 inserted = page.insert_textbox(
                     crop_bbox,
                     "[IMG]" + desc + "[/IMG]",
