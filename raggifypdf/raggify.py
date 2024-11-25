@@ -120,16 +120,24 @@ class PDFModifier:
             )  # Drawing a white rectangle over the image
             # insert textbox at old image location with image description
             # with elongated box along y-direction to ensure the text fits
-            inserted = page.insert_textbox(
-                pymupdf.Rect(crop.bbox[0], crop.bbox[1], crop.bbox[2], 1000),
-                "[IMG]" + desc + "[/IMG]",
-                fontsize=2,
-                color=(0, 0, 0),
-                align=0,
+            crop_bbox = pymupdf.Rect(
+                crop.bbox[0], crop.bbox[1], crop.bbox[2], crop.bbox[3] + 1000
             )
-            if inserted < 0:
+            if crop_bbox.is_valid() and (not crop_bbox.is_empty()):
+                inserted = page.insert_textbox(
+                    crop_bbox,
+                    "[IMG]" + desc + "[/IMG]",
+                    fontsize=2,
+                    color=(0, 0, 0),
+                    align=0,
+                )
+                if inserted < 0:
+                    raise Warning(
+                        f"text could not be inserted on page {page_num}, bounding_box {crop.bbox}"
+                    )
+            else:
                 raise Warning(
-                    f"text could not be inserted on page {page_num}, bounding_box {crop.bbox}"
+                    f"Invalid or empty bounding box {crop_bbox} for crop on page {page_num}"
                 )
         return True
 
