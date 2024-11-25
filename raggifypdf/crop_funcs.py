@@ -8,7 +8,7 @@ from raggifypdf.image_funcs import Cropped
 
 def convert_crop_to_png(crop: Cropped):
     with io.BytesIO() as output:
-        crop.img.save(output, format="PNG")
+        crop.img.convert("RGB").save(output, format="PNG")
         return output.getvalue()
 
 
