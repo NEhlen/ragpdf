@@ -101,7 +101,16 @@ class PDFModifier:
         # combine into one list
         crops_total = crops_imgs
         crops_total.extend(crops_ml)
-        return crops_total
+        crops_valid = [
+            crop
+            for crop in crops_total
+            if crop.bbox.is_valid and not crop.bbox.is_empty
+        ]
+        if len(crops_valid) != len(crops_total):
+            logging.warning(
+                f"Discarded {len(crops_total)-len(crops_valid)} invalid bounding boxes on page {page_num}"
+            )
+        return crops_valid
 
     def evaluate_crops(self, crops: list[Cropped]) -> list[str]:
         descriptions = []
@@ -123,7 +132,7 @@ class PDFModifier:
             crop_bbox = pymupdf.Rect(
                 crop.bbox[0], crop.bbox[1], crop.bbox[2], crop.bbox[3] + 1000
             )
-            if crop_bbox.is_valid or (not crop_bbox.is_empty):
+            if crop_bbox.is_valid and (not crop_bbox.is_empty):
                 inserted = page.insert_textbox(
                     crop_bbox,
                     "[IMG]" + desc + "[/IMG]",
@@ -132,11 +141,11 @@ class PDFModifier:
                     align=0,
                 )
                 if inserted < 0:
-                    raise Warning(
+                    logging.warning(
                         f"text could not be inserted on page {page_num}, bounding_box {crop.bbox}"
                     )
             else:
-                raise Warning(
+                logging.warning(
                     f"Invalid or empty bounding box {crop_bbox} for crop on page {page_num}"
                 )
         return True
