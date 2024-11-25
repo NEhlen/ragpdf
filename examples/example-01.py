@@ -14,7 +14,7 @@ cropper = CropperModelYOLO(confidence_threshold=0.8)
 analyzer = CropAnalyzerHF()
 
 # load pdf
-pdf = pymupdf.open("examples/1809.01886v1.pdf")
+pdf = pymupdf.open("examples/example_data/1809.01886v1.pdf")
 
 # initialize modifier
 modifier = PDFModifier(pdf, cropper, analyzer)
@@ -25,4 +25,4 @@ modifier = PDFModifier(pdf, cropper, analyzer)
 modified_pdf = modifier.modify(pages="full")
 
 # save modified pdf
-modifier.save_pdf("examples/1809.01886v1_modified.pdf")
+modifier.save_pdf("examples/example_data/1809.01886v1_modified.pdf")
