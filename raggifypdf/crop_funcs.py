@@ -131,6 +131,8 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
     # get a description of the crop
     def describe_crop(self, crop: Cropped, context: str = None) -> str:
         from vertexai.generative_models import Part
+        from google.api_core import retry
+        from google.generativeai.types import RequestOptions
 
         encoded_image = Part.from_data(
             mime_type="image/png", data=convert_crop_to_base64(crop)
@@ -144,6 +146,9 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
             [encoded_image, txt],
             generation_config=self.generation_config,
             stream=False,
+            request_options=RequestOptions(
+                retry=retry.Retry(initial=1, multiplier=2, maximum=60, timeout=120, predicate=retry.if_exception_type(Exception))
+            )
         )
         return response.text
 
