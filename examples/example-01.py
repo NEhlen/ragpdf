@@ -1,5 +1,10 @@
 from raggifypdf.raggify import PDFModifier
-from raggifypdf.crop_funcs import CropAnalyzerOpenAI, CropAnalyzerGCP, CropAnalyzerHF
+from raggifypdf.crop_funcs import (
+    CropAnalyzerOpenAI,
+    CropAnalyzerGCP,
+    CropAnalyzerGCPApiKey,
+    CropAnalyzerHF,
+)
 from raggifypdf.image_funcs import CropperModelYOLO
 import pymupdf
 
@@ -8,8 +13,10 @@ cropper = CropperModelYOLO(confidence_threshold=0.8)
 
 # load analyzer that turns cropped images into descriptions
 # to use the OpenAI Analyzer, the OPENAI_API_KEY enviroment variable needs to be set
+# similarly to use the GCP ApiKey Analyzer, the api_key parameter needs to be set
 
 # analyzer = CropAnalyzerOpenAI(model_id="gpt-4o-mini")
+# analyzer = CropAnalyzerGCPApiKey(api_key = "<...>")
 # analyzer = CropAnalyzerGCP()
 analyzer = CropAnalyzerHF()
 
