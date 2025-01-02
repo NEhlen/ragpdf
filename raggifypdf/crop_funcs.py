@@ -91,7 +91,7 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
 class CropAnalyzerGCP(CropAnalyzerGeneral):
     def __init__(self, prompt: str = None, **kwargs):
         import vertexai
-        from google.generativeai import GenerativeModel
+        from vertexai.generative_models import GenerativeModel
 
         if prompt:
             self.prompt = prompt
@@ -131,8 +131,6 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
     # get a description of the crop
     def describe_crop(self, crop: Cropped, context: str = None) -> str:
         from vertexai.generative_models import Part
-        from google.api_core import retry
-        from google.generativeai.types import RequestOptions
 
         encoded_image = Part.from_data(
             mime_type="image/png", data=convert_crop_to_base64(crop)
@@ -146,9 +144,77 @@ class CropAnalyzerGCP(CropAnalyzerGeneral):
             [encoded_image, txt],
             generation_config=self.generation_config,
             stream=False,
-            request_options=RequestOptions(
-                retry=retry.Retry(initial=1, multiplier=2, maximum=60, timeout=120, predicate=retry.if_exception_type(Exception))
+        )
+        return response.text
+
+
+class CropAnalyzerGCPApiKey(CropAnalyzerGeneral):
+    def __init__(self, prompt: str = None, **kwargs):
+        import vertexai
+        import google.generativeai as genai
+
+        if prompt:
+            self.prompt = prompt
+        else:
+            self.prompt = (
+                "I'm sending you a cropped image from a PDF. "
+                "Please try to describe in detail what is shown in the image. "
+                "In particular if the image is a schematic from a manual describe the measurements shown and what they are measuring."
+                "You might also get additional context for interpreting the image, but I cannot guarantee that."
             )
+        if "location" not in kwargs:
+            location = "europe-west3"
+        else:
+            location = kwargs["location"]
+
+        if "project" not in kwargs:
+            print("No GCP project-id given in kwarg 'project', using None instead")
+            project = None
+        else:
+            project = kwargs["project"]
+        vertexai.init(project=project, location=location)
+
+        if "model_id" in kwargs:
+            self.model = genai.GenerativeModel(kwargs["model_id"])
+        else:
+            self.model = genai.GenerativeModel("gemini-1.5-flash-002")
+
+        if "api_key" in kwargs:
+            genai.configure(api_key=kwargs["api_key"])
+        else:
+            raise ValueError("No api_key given in kwargs")
+
+        if "generation_config" in kwargs:
+            self.generation_config = kwargs["generation_config"]
+        else:
+            self.generation_config = {
+                "max_output_tokens": 8192,
+                "temperature": 0.7,
+                "top_p": 0.95,
+            }
+
+    # get a description of the crop
+    def describe_crop(self, crop: Cropped, context: str = None) -> str:
+        from google.api_core import retry
+        from google.generativeai.types import RequestOptions
+
+        txt = self.prompt
+        if context:
+            txt += "\n\nCONTEXT:\n" + context
+
+        response = self.model.generate_content(
+            [crop.img, txt],
+            generation_config=self.generation_config,
+            stream=False,
+            request_options=RequestOptions(
+                retry=retry.Retry(
+                    initial=1,
+                    multiplier=2,
+                    maximum=60,
+                    timeout=120,
+                    predicate=retry.if_exception_type(Exception),
+                )
+            ),
         )
         return response.text
 
