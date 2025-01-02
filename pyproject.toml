@@ -44,6 +44,6 @@ formatting = [
 ]
 dev = ['ragpdf[linting, formatting]']
 
-gcp = ["google-cloud-aiplatform"]
+gcp = ["google-cloud-aiplatform", "google-generativeai"]
 
 huggingface = ["accelerate"]

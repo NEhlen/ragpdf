@@ -9,3 +9,4 @@ google-cloud-aiplatform
 accelerate
 flash_attn
 torch
+google-generativeai

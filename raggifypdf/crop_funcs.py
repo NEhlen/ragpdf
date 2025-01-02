@@ -91,7 +91,7 @@ class CropAnalyzerOpenAI(CropAnalyzerGeneral):
 class CropAnalyzerGCP(CropAnalyzerGeneral):
     def __init__(self, prompt: str = None, **kwargs):
         import vertexai
-        from vertexai.generative_models import GenerativeModel
+        from google.generativeai import GenerativeModel
 
         if prompt:
             self.prompt = prompt
